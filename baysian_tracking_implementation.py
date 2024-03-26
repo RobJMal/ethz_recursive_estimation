@@ -61,11 +61,11 @@ def calculate_process_model_PDF(state, process_noise_pdf, num_states):
     '''
     Calculates PDF of process model 
     '''
-    next_state = calculate_next_state(state, num_states)
+    x_k = calculate_next_state(state, num_states)
 
-    if next_state == ((state + 1) % num_states):
+    if x_k == ((state + 1) % num_states):
         return process_noise_pdf
-    elif next_state == ((state - 1) % num_states):
+    elif x_k == ((state - 1) % num_states):
         return 1 - process_noise_pdf
 
     return 0
@@ -93,5 +93,6 @@ print("State space: ", state_space)
 print("")
 print("Position theta: ", position_theta)
 
-# Initialization
+# ----- INITIALIZATION -----
+
 
