@@ -82,9 +82,12 @@ def calculate_sensor_model_PDF(sensor_noise_tolerance, sensor_position, theta):
 
     return 0
 
+def calculate_theta(state, num_states):
+    return 2*np.pi*(state/num_states)
+
 # ----- SETUP -----
 N = 100
-state_space = np.arange(0, N-1, 1)
+state_space = np.arange(0, N, 1)
 position_theta = 2*np.pi*(state_space/N)
 
 posterior_pdf = np.zeros(N)
@@ -101,13 +104,31 @@ updated_prior_pdf = np.copy(prior_pdf)
 initial_state = N//4
 
 # ----- RECURSION -----
-# Updating Prior PDF
+# Updating prior PDF
 for i in range(len(prior_pdf)):
     state_i_prob_value = 0.0
     for j in range(N):
         state_i_prob_value += calculate_process_model_PDF(state=i, process_noise_pdf=R_PROCESS_NOISE_PDF, num_states=N_NUM_STATES)*posterior_pdf[j]
     
-    updated_posterior_pdf[i] = state_i_prob_value
+    updated_prior_pdf[i] = state_i_prob_value
 
-print(updated_posterior_pdf)
+print("Updated prior PDF: ", updated_prior_pdf)
+print("Sum check: ", np.sum(updated_prior_pdf))
+print("")
 
+# Updating posterior PDF 
+for i in range(len(posterior_pdf)):
+    theta_i = calculate_theta(state_space[i], N_NUM_STATES)
+    measurement_model_value = calculate_sensor_model_PDF(E_SENSOR_NOISE_TOLERANCE, L_SENSOR_DISTANCE, theta_i)
+    prior_value = updated_prior_pdf[j]
+
+    normalization_value = 0.0
+    for j in range(N):
+        theta_j = calculate_theta(state_space[j], N_NUM_STATES)
+        normalization_value += calculate_sensor_model_PDF(E_SENSOR_NOISE_TOLERANCE, L_SENSOR_DISTANCE, theta_j)*updated_prior_pdf[j]
+
+    updated_posterior_pdf[i] = (measurement_model_value*prior_value)/normalization_value
+
+print("Updated posterior PDF: ", updated_posterior_pdf)
+print("Sum check: ", np.sum(updated_posterior_pdf))
+print("")
