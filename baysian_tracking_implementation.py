@@ -18,7 +18,7 @@ def calculate_process_noise(p_r):
     Calculates the process noise v(k-1). 
 
     Parameters:
-        - r: Probability of returning 1 
+        - p_r: Probability of returning 1 
     '''
     return np.random.choice([1, -1], 1, p=[p_r, 1-p_r])[0]
 
@@ -83,6 +83,13 @@ def calculate_sensor_model_PDF(sensor_noise_tolerance, sensor_position, theta):
     return 0
 
 def calculate_theta(state, num_states):
+    '''
+    Calculates the respective theta based on the state.
+
+    Parameters:
+        - state: State of the system 
+        - num_states: Number of states
+    '''
     return 2*np.pi*(state/num_states)
 
 # ----- SETUP -----
