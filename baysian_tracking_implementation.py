@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 N_NUM_STATES = 100
 L_SENSOR_DISTANCE = 2.0
 R_PROCESS_NOISE_PDF = 0.50
+E_SENSOR_NOISE_TOLERANCE = 0.50
 
 # ----- HELPER FUNCTIONS -----
 def calculate_process_noise(p_r):
@@ -45,7 +46,7 @@ def calculate_sensor_noise(epsilon):
     '''
     return np.random.uniform(-1*epsilon, epsilon)
 
-def calculate_distance_measurement(sensor_position, theta, noise):
+def calculate_distance_measurement(sensor_position, theta):
     '''
     Model of the distance measurement. 
 
@@ -53,9 +54,10 @@ def calculate_distance_measurement(sensor_position, theta, noise):
         - L: position of measurement sensor
         - theta: position of object on circle
     '''
-    return np.sqrt((sensor_position - np.cos(theta))**2 + np.sin(theta)**2) + noise
+    sensor_noise = calculate_sensor_noise(E_SENSOR_NOISE_TOLERANCE)
+    return np.sqrt((sensor_position - np.cos(theta))**2 + np.sin(theta)**2) + sensor_noise
 
-def calculate_process_PDF(state, process_noise_pdf, num_states):
+def calculate_process_model_PDF(state, process_noise_pdf, num_states):
     '''
     Calculates PDF of process model 
     '''
@@ -68,6 +70,16 @@ def calculate_process_PDF(state, process_noise_pdf, num_states):
 
     return 0
 
+def calculate_sensor_model_PDF(sensor_noise_tolerance, sensor_position, theta):
+    '''
+    Calculates PDF of sensor model
+    '''
+    z_k = calculate_distance_measurement(sensor_position, theta)
+
+    if np.abs(z_k - np.sqrt((sensor_position - np.cos(theta))**2 - np.sin(theta)**2)) <= sensor_noise_tolerance:
+        return 1/(2*sensor_noise_tolerance)
+
+    return 0
 
 # ----- SETUP -----
 N = 100
