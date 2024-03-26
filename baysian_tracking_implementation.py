@@ -4,8 +4,11 @@ unit circle in discrete steps.
 """
 
 import numpy as np
-from random import random 
 import matplotlib.pyplot as plt 
+
+N_NUM_STATES = 100
+L_SENSOR_DISTANCE = 2.0
+R_PROCESS_NOISE_PDF = 0.50
 
 # ----- HELPER FUNCTIONS -----
 def calculate_process_noise(p_r):
@@ -17,17 +20,7 @@ def calculate_process_noise(p_r):
     '''
     return np.random.choice([1, -1], 1, p=[p_r, 1-p_r])[0]
 
-def calculate_sensor_noise(epsilon):
-    '''
-    Calculates the measurement noise of sensor based 
-    on +/- epsilon
-
-    Parameters:
-        - epsilon: tolerance of range of noise (assuming +/-)
-    '''
-    return np.random.uniform(-1*epsilon, epsilon)
-
-def calculate_next_state(state, noise, num_states):
+def calculate_next_state(state, num_states):
     '''
     Calculates the next state of object from 
     previous state and previous noise 
@@ -39,7 +32,18 @@ def calculate_next_state(state, noise, num_states):
         - noise: Process noise
         - num_states: Number of states of the system 
     '''
-    return (state + noise) % num_states
+    process_noise = calculate_process_noise(R_PROCESS_NOISE_PDF)
+    return (state + process_noise) % num_states
+
+def calculate_sensor_noise(epsilon):
+    '''
+    Calculates the measurement noise of sensor based 
+    on +/- epsilon
+
+    Parameters:
+        - epsilon: tolerance of range of noise (assuming +/-)
+    '''
+    return np.random.uniform(-1*epsilon, epsilon)
 
 def calculate_distance_measurement(sensor_position, theta, noise):
     '''
@@ -50,6 +54,20 @@ def calculate_distance_measurement(sensor_position, theta, noise):
         - theta: position of object on circle
     '''
     return np.sqrt((sensor_position - np.cos(theta))**2 + np.sin(theta)**2) + noise
+
+def calculate_process_PDF(state, process_noise_pdf, num_states):
+    '''
+    Calculates PDF of process model 
+    '''
+    next_state = calculate_next_state(state, num_states)
+
+    if next_state == ((state + 1) % num_states):
+        return process_noise_pdf
+    elif next_state == ((state - 1) % num_states):
+        return 1 - process_noise_pdf
+
+    return 0
+
 
 # ----- SETUP -----
 N = 100
