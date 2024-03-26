@@ -10,6 +10,7 @@ N_NUM_STATES = 100
 L_SENSOR_DISTANCE = 2.0
 R_PROCESS_NOISE_PDF = 0.50
 E_SENSOR_NOISE_TOLERANCE = 0.50
+K_RECURSIVE_STEPS = 5
 
 # ----- HELPER FUNCTIONS -----
 def calculate_process_noise(p_r):
@@ -89,10 +90,24 @@ position_theta = 2*np.pi*(state_space/N)
 posterior_pdf = np.zeros(N)
 prior_pdf = np.zeros(N)
 
-print("State space: ", state_space)
-print("")
-print("Position theta: ", position_theta)
-
 # ----- INITIALIZATION -----
+# Initializing for maximum ignorance 
+posterior_pdf = (1/N_NUM_STATES)*np.ones(N)
+prior_pdf = (1/N_NUM_STATES)*np.ones(N)
 
+updated_posterior_pdf = np.copy(posterior_pdf)
+updated_prior_pdf = np.copy(prior_pdf)
+
+initial_state = N//4
+
+# ----- RECURSION -----
+# Updating Prior PDF
+for i in range(len(prior_pdf)):
+    state_i_prob_value = 0.0
+    for j in range(N):
+        state_i_prob_value += calculate_process_model_PDF(state=i, process_noise_pdf=R_PROCESS_NOISE_PDF, num_states=N_NUM_STATES)*posterior_pdf[j]
+    
+    updated_posterior_pdf[i] = state_i_prob_value
+
+print(updated_posterior_pdf)
 
