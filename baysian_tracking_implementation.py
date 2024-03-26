@@ -17,6 +17,16 @@ def calculate_process_noise(p_r):
     '''
     return np.random.choice([1, -1], 1, p=[p_r, 1-p_r])[0]
 
+def calculate_sensor_noise(epsilon):
+    '''
+    Calculates the measurement noise of sensor based 
+    on +/- epsilon
+
+    Parameters:
+        - epsilon: tolerance of range of noise (assuming +/-)
+    '''
+    return np.random.uniform(-1*epsilon, epsilon)
+
 def calculate_next_state(state, noise, num_states):
     '''
     Calculates the next state of object from 
