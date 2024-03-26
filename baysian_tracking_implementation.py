@@ -5,6 +5,7 @@ unit circle in discrete steps.
 
 import numpy as np
 import matplotlib.pyplot as plt 
+import matplotlib.cm as cm
 
 N_NUM_STATES = 100
 L_SENSOR_DISTANCE = 2.0
@@ -114,6 +115,7 @@ def update_prior(k, object_pdf):
     
     return prior_pdf
 
+
 def calculate_dynamics(k, object_location) -> float:
     """
     Calculates the dynamics of the object and returns 
@@ -131,7 +133,7 @@ def calculate_dynamics(k, object_location) -> float:
         object_location[k, 0] = np.mod(object_location[k-1, 0] - 1, N_NUM_STATES)
 
     # Determine object location on unit circle 
-    theta = calculate_theta(object_location[k,0])
+    theta = calculate_theta(object_location[k,0], N_NUM_STATES)
     x_location, y_location = np.cos(theta), np.sin(theta)
 
     # Calculate actual distance to object
@@ -151,7 +153,7 @@ def update_measurement(k, prior_pdf, measured_distance, object_pdf):
         - measured_distance [float]: Distance reported by the sensor 
     """
     for i in range(N_NUM_STATES):
-        theta =  calculate_theta(i)
+        theta =  calculate_theta(i, N_NUM_STATES)
         x_location_hypothesis = np.cos(theta)
         y_location_hypothesis = np.sin(theta)
         distance_hypothesis = np.sqrt((L_SENSOR_DISTANCE - x_location_hypothesis)**2 + y_location_hypothesis**2)
@@ -163,7 +165,10 @@ def update_measurement(k, prior_pdf, measured_distance, object_pdf):
         else:
             obs_meas_cond_prob = 0.0
 
-        object_pdf[k, i] = obs_meas_cond_prob * prior_pdf[0, i] # Why do we combine both?
+        # TODO: Why do we combine both probabilities? 
+        print(prior_pdf)
+        object_pdf[k, i] = obs_meas_cond_prob * prior_pdf[i] 
+
 
 # ----- INITIALIZATION -----
 N = 100
@@ -182,21 +187,33 @@ object_location[0, 0] = N//4
 for k in range(1, T_MAX_TIME, 1):
 
     measured_distance = calculate_dynamics(k, object_location)
-    prior = update_prior(k)
+    prior = update_prior(k, object_pdf)
+    update_measurement(k, prior, measured_distance, object_pdf)
 
-# # Updating posterior PDF 
-# for i in range(len(posterior_pdf)):
-#     theta_i = calculate_theta(state_space[i], N_NUM_STATES)
-#     measurement_model_value = calculate_sensor_model_PDF(E_SENSOR_NOISE_TOLERANCE, L_SENSOR_DISTANCE, theta_i)
-#     prior_value = updated_prior_pdf[j]
+    # Normalizing the weights
+    normalization_constant = np.sum(object_pdf[k, :])
 
-#     normalization_value = 0.0
-#     for j in range(N):
-#         theta_j = calculate_theta(state_space[j], N_NUM_STATES)
-#         normalization_value += calculate_sensor_model_PDF(E_SENSOR_NOISE_TOLERANCE, L_SENSOR_DISTANCE, theta_j)*updated_prior_pdf[j]
+    if normalization_constant > 1e-06:
+        object_pdf[k, :] = object_pdf[k, :] / normalization_constant
+    else:
+        object_pdf[k, :] = object_pdf[0, :]
+        print(f"\nRe-initializing estimator at time step {k}")
 
-#     updated_posterior_pdf[i] = (measurement_model_value*prior_value)/normalization_value
 
-# print("Updated posterior PDF: ", updated_posterior_pdf)
-# print("Sum check: ", np.sum(updated_posterior_pdf))
-# print("")
+# Visualize the results
+fig = plt.figure()
+ax = plt.axes(projection="3d")
+ax.set_xlabel("POSITION $x(k)/N$ ")
+ax.set_ylabel("TIME STEP $k$")
+X = np.arange(0, N_NUM_STATES) / N_NUM_STATES
+Y = np.arange(0, T_MAX_TIME + 1)
+X, Y = np.meshgrid(X, Y)
+ax.plot_surface(X, Y, object_location, rstride=1, cstride=1, cmap=cm.coolwarm)
+ax.plot3D(
+    object_location / N_NUM_STATES,
+    np.arange(0, T_MAX_TIME + 1),
+    np.ones((T_MAX_TIME + 1, 1)) * np.max(W),
+    label="Actual Position",
+)
+ax.legend()
+plt.show()
