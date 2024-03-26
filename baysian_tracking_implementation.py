@@ -7,14 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import matplotlib.cm as cm
 
-N_NUM_STATES = 100
-L_SENSOR_DISTANCE = 2.0
-R_PROCESS_NOISE_PDF = 0.50
-E_SENSOR_NOISE_TOLERANCE = 0.50
-K_RECURSIVE_STEPS = 5
-T_MAX_TIME = 100
-
-P_OBJECT_MOVE_CCW = 0.5
+from numpy.typing import NDArray
 
 # ----- HELPER FUNCTIONS -----
 def calculate_process_noise(p_r):
@@ -95,28 +88,11 @@ def calculate_theta(state, num_states):
         - state: State of the system 
         - num_states: Number of states
     '''
-    return 2*np.pi*(state/num_states)
+    return 2*np.pi*state/num_states
+
 
 # Additional functions from solution code 
-def update_prior(k, object_pdf):
-    '''
-    Predict the next state with given model 
-
-    Parameters:
-        - k (int): current time step 
-    '''
-    prior_pdf = np.zeros(N)
-
-    for state in range(len(prior_pdf)):
-        prior_pdf = (
-            R_PROCESS_NOISE_PDF * object_pdf[k-1, np.mod(state-1, N_NUM_STATES)] + 
-            (1 - R_PROCESS_NOISE_PDF) * object_pdf[k-1, np.mod(state+1, N_NUM_STATES)]
-        )
-    
-    return prior_pdf
-
-
-def calculate_dynamics(k, object_location) -> float:
+def calculate_dynamics(k, object_location: NDArray) -> float:
     """
     Calculates the dynamics of the object and returns 
     the measured distance 
@@ -143,6 +119,24 @@ def calculate_dynamics(k, object_location) -> float:
     return measured_distance
 
 
+def update_prior(k, object_pdf):
+    '''
+    Predict the next state with given model 
+
+    Parameters:
+        - k (int): current time step 
+    '''
+    prior_pdf = np.zeros((1, N_NUM_STATES))
+
+    for state in range(N_NUM_STATES):
+        prior_pdf[:, state] = (
+            R_PROCESS_NOISE_PDF * object_pdf[k-1, np.mod(state-1, N_NUM_STATES)] + 
+            (1 - R_PROCESS_NOISE_PDF) * object_pdf[k-1, np.mod(state+1, N_NUM_STATES)]
+        )
+    
+    return prior_pdf
+
+
 def update_measurement(k, prior_pdf, measured_distance, object_pdf):
     """
     Combines prediction with measurement 
@@ -165,55 +159,62 @@ def update_measurement(k, prior_pdf, measured_distance, object_pdf):
         else:
             obs_meas_cond_prob = 0.0
 
-        # TODO: Why do we combine both probabilities? 
-        print(prior_pdf)
-        object_pdf[k, i] = obs_meas_cond_prob * prior_pdf[i] 
+        object_pdf[k, i] = obs_meas_cond_prob * prior_pdf[0, i] 
 
 
 # ----- INITIALIZATION -----
-N = 100
-state_space = np.arange(0, N, 1)
-posterior_pdf = np.zeros(N)
+if __name__ == "__main__":
+    N_NUM_STATES = 100  # Also number of dicretized parts of circle
+    L_SENSOR_DISTANCE = 2.0
+    R_PROCESS_NOISE_PDF = 0.50
+    E_SENSOR_NOISE_TOLERANCE = 0.50
+    K_RECURSIVE_STEPS = 5
+    T_MAX_TIME = 100
+    P_OBJECT_MOVE_CCW = 0.5
 
-# Keeps track of the probability that the object is at a 
-# location i at time t
-object_pdf = np.zeros((T_MAX_TIME + 1, N_NUM_STATES))
-object_pdf[0,:] = 1/N_NUM_STATES * np.ones(N_NUM_STATES)    # Setting to 1/N to indicate all positions are likely    
+    state_space = np.arange(0, N_NUM_STATES, 1)
+    posterior_pdf = np.zeros(N_NUM_STATES)
 
-object_location = np.zeros((T_MAX_TIME, 1))
-object_location[0, 0] = N//4
+    # Keeps track of the probability that the object is at a 
+    # location i at time t
+    object_pdf = np.zeros((T_MAX_TIME + 1, N_NUM_STATES))
+    object_pdf[0,:] = 1/N_NUM_STATES * np.ones(N_NUM_STATES)    # Setting to 1/N to indicate all positions are likely    
 
-# ----- RECURSION -----
-for k in range(1, T_MAX_TIME, 1):
+    object_location = np.zeros((T_MAX_TIME + 1, 1))
+    object_location[0, 0] = N_NUM_STATES // 4
 
-    measured_distance = calculate_dynamics(k, object_location)
-    prior = update_prior(k, object_pdf)
-    update_measurement(k, prior, measured_distance, object_pdf)
+    # ----- RECURSION -----
+    for k in range(1, T_MAX_TIME + 1):
 
-    # Normalizing the weights
-    normalization_constant = np.sum(object_pdf[k, :])
+        measured_distance = calculate_dynamics(k, object_location)
+        prior = update_prior(k, object_pdf)
+        update_measurement(k, prior, measured_distance, object_pdf)
 
-    if normalization_constant > 1e-06:
-        object_pdf[k, :] = object_pdf[k, :] / normalization_constant
-    else:
-        object_pdf[k, :] = object_pdf[0, :]
-        print(f"\nRe-initializing estimator at time step {k}")
+        # Normalizing the weights
+        normalization_constant = np.sum(object_pdf[k, :])
 
+        if normalization_constant > 1e-06:
+            object_pdf[k, :] = object_pdf[k, :] / normalization_constant
+        else:
+            object_pdf[k, :] = object_pdf[0, :]
+            print(f"\nRe-initializing estimator at time step {k}")
 
-# Visualize the results
-fig = plt.figure()
-ax = plt.axes(projection="3d")
-ax.set_xlabel("POSITION $x(k)/N$ ")
-ax.set_ylabel("TIME STEP $k$")
-X = np.arange(0, N_NUM_STATES) / N_NUM_STATES
-Y = np.arange(0, T_MAX_TIME + 1)
-X, Y = np.meshgrid(X, Y)
-ax.plot_surface(X, Y, object_location, rstride=1, cstride=1, cmap=cm.coolwarm)
-ax.plot3D(
-    object_location / N_NUM_STATES,
-    np.arange(0, T_MAX_TIME + 1),
-    np.ones((T_MAX_TIME + 1, 1)) * np.max(W),
-    label="Actual Position",
-)
-ax.legend()
-plt.show()
+    print(np.sum(object_pdf, axis=1))
+
+    # Visualize the results
+    fig = plt.figure()
+    ax = plt.axes(projection="3d")
+    ax.set_xlabel("POSITION $x(k)/N$ ")
+    ax.set_ylabel("TIME STEP $k$")
+    X = np.arange(0, N_NUM_STATES) / N_NUM_STATES
+    Y = np.arange(0, T_MAX_TIME + 1)
+    X, Y = np.meshgrid(X, Y)
+    ax.plot_surface(X, Y, object_pdf, rstride=1, cstride=1, cmap=cm.coolwarm)
+    ax.plot3D(
+        object_location / N_NUM_STATES,
+        np.arange(0, T_MAX_TIME + 1),
+        np.ones((T_MAX_TIME + 1, 1)) * np.max(object_pdf),
+        label="Actual Position",
+    )
+    ax.legend()
+    plt.show()
